@@ -34,3 +34,24 @@ test('custom Codex homes are carried into both restore and resume commands', () 
     /^\$env:CODEX_HOME = '\/tmp\/other profile'; codex unarchive/,
   );
 });
+
+test('PowerShell paths escape every single-quote delimiter, including smart quotes', () => {
+  for (const quote of ["'", '\u2018', '\u2019', '\u201a', '\u201b']) {
+    const path = `C:\\project${quote}; Write-Output ${quote}injected${quote}; #`;
+    const literal = `'C:\\project${quote}${quote}; Write-Output ${quote}${quote}injected${quote}${quote}; #'`;
+    assert.equal(
+      resumeCommand({ id, cwd: path, codexHome: path }, 'powershell'),
+      `$env:CODEX_HOME = ${literal}; Set-Location -LiteralPath ${literal}; if ($?) { codex resume ${id} }`,
+    );
+  }
+});
+
+test('resume commands refuse terminal control characters and bidirectional overrides in paths', () => {
+  for (const control of ['\0', '\n', '\r', '\x1b[201~', '\x7f', '\u0085', '\u2028', '\u202e']) {
+    const path = `/tmp/project${control}injected`;
+    for (const shell of ['posix', 'powershell'] as const) {
+      assert.throws(() => resumeCommand({ id, cwd: path }, shell), /unsafe.*character/i);
+      assert.throws(() => resumeCommand({ id, codexHome: path }, shell), /unsafe.*character/i);
+    }
+  }
+});

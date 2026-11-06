@@ -64,7 +64,6 @@ function integer(params: URLSearchParams, name: string, fallback: number, max: n
 }
 
 export function createHandler({ store, token, origin, demo = false }: HandlerOptions) {
-  const cookieName = `playback_${new URL(origin).port}`;
   return async (req: RequestLike, res: ResponseLike): Promise<void> => {
     for (const [key, value] of Object.entries(securityHeaders)) res.setHeader(key, value);
     const json = (status: number, body: unknown): void => {
@@ -79,21 +78,17 @@ export function createHandler({ store, token, origin, demo = false }: HandlerOpt
       )
         return json(403, { error: 'This app only accepts requests from its local browser page.' });
       const url = new URL(req.url ?? '/', origin);
-      if (url.pathname === '/api/unlock' && req.method === 'POST') {
-        req.resume();
-        if (!equalToken(req.headers.authorization?.replace(/^Bearer /, ''), token))
-          return json(401, { error: 'Open the access link printed in your terminal.' });
-        res.setHeader('Set-Cookie', `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/`);
-        return json(200, { ok: true });
-      }
       if (url.pathname.startsWith('/api/')) {
-        const cookie = req.headers.cookie
-          ?.split(';')
-          .map((c) => c.trim())
-          .find((c) => c.startsWith(`${cookieName}=`))
-          ?.slice(cookieName.length + 1);
-        if (!equalToken(cookie, token))
+        // Cookies are shared across ports. Require an explicit bearer header so
+        // visiting another loopback service cannot disclose the access key.
+        const authorization = req.headers.authorization;
+        const key = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+        if (!equalToken(key, token))
           return json(401, { error: 'Open the access link printed in your terminal to connect.' });
+        if (url.pathname === '/api/unlock' && req.method === 'POST') {
+          req.resume();
+          return json(200, { ok: true });
+        }
         if (url.pathname === '/api/refresh' && req.method === 'POST') {
           req.resume();
           await store.refresh();

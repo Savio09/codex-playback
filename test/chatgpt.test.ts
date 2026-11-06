@@ -103,3 +103,18 @@ test('terminal handoff passes only a file reference to Codex and cleans it after
   assert.match(result.text, /Try basil and mint/);
   await assert.rejects(stat(result.file), { code: 'ENOENT' });
 });
+
+test('ChatGPT handoff paths escape PowerShell smart quotes and refuse terminal controls', () => {
+  const id = required(parseChatGptExport([conversation]).sessions[0]).id;
+  for (const quote of ['\u2018', '\u2019', '\u201a', '\u201b']) {
+    const file = `C:\\export${quote}; Write-Output injected; #.json`;
+    assert.ok(
+      handoffCommand(id, file, 'powershell').includes(
+        `'C:\\export${quote}${quote}; Write-Output injected; #.json'`,
+      ),
+    );
+  }
+  for (const shell of ['posix', 'powershell'] as const) {
+    assert.throws(() => handoffCommand(id, '/tmp/export\x1b[201~.json', shell), /unsafe.*character/i);
+  }
+});

@@ -72,24 +72,23 @@ async function setup(t: TestContext) {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
-  const setCookie = required(unlock.headers.get('set-cookie'));
-  assert.match(setCookie, /HttpOnly; SameSite=Strict/);
-  const cookie = required(setCookie.split(';')[0]);
-  return { base, cookie, request, store, home };
+  assert.equal(unlock.status, 200);
+  const authorization = `Bearer ${token}`;
+  return { base, authorization, request, store, home };
 }
 
-test('requires auth and gives the UI a private SameSite HttpOnly cookie', async (t) => {
-  const { base, cookie, request } = await setup(t);
+test('requires a bearer key on every history request', async (t) => {
+  const { base, authorization, request } = await setup(t);
   assert.equal((await request(`${base}/api/sessions`)).status, 401);
-  const response = await request(`${base}/api/sessions?q=inverted`, { headers: { cookie } });
+  const response = await request(`${base}/api/sessions?q=inverted`, { headers: { authorization } });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).total, 1);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.ok(required(response.headers.get('content-security-policy')).includes("connect-src 'self'"));
 });
 test('pages transcripts and generates commands without accepting file paths', async (t) => {
-  const { base, cookie, request } = await setup(t);
-  const response = await request(`${base}/api/sessions/${id}?limit=1`, { headers: { cookie } });
+  const { base, authorization, request } = await setup(t);
+  const response = await request(`${base}/api/sessions/${id}?limit=1`, { headers: { authorization } });
   const session = await response.json();
   assert.equal(session.messages.length, 1);
   assert.equal(session.hasMore, true);
@@ -97,27 +96,31 @@ test('pages transcripts and generates commands without accepting file paths', as
     session.commands.posix,
     new RegExp(`^cd -- '/tmp/example' && CODEX_HOME='[^']+' codex resume ${id}$`),
   );
-  assert.equal((await request(`${base}/api/sessions/not-found`, { headers: { cookie } })).status, 404);
-  assert.equal((await request(`${base}/api/sessions?limit=-1`, { headers: { cookie } })).status, 400);
-  assert.equal((await request(`${base}/api/sessions?sort=invalid`, { headers: { cookie } })).status, 400);
+  assert.equal((await request(`${base}/api/sessions/not-found`, { headers: { authorization } })).status, 404);
+  assert.equal((await request(`${base}/api/sessions?limit=-1`, { headers: { authorization } })).status, 400);
+  assert.equal(
+    (await request(`${base}/api/sessions?sort=invalid`, { headers: { authorization } })).status,
+    400,
+  );
 });
 test('rejects foreign origins and host headers even with credentials', async (t) => {
-  const { base, cookie, request } = await setup(t);
+  const { base, authorization, request } = await setup(t);
   assert.equal(
     (
       await request(`${base}/api/refresh`, {
         method: 'POST',
-        headers: { cookie, origin: 'https://unrelated.example' },
+        headers: { authorization, origin: 'https://unrelated.example' },
       })
     ).status,
     403,
   );
   assert.equal(
-    (await request(`${base}/api/sessions`, { headers: { cookie, host: 'evil.example' } })).status,
+    (await request(`${base}/api/sessions`, { headers: { authorization, host: 'evil.example' } })).status,
     403,
   );
   assert.equal(
-    (await request(`${base}/api/refresh`, { method: 'POST', headers: { cookie, origin: base } })).status,
+    (await request(`${base}/api/refresh`, { method: 'POST', headers: { authorization, origin: base } }))
+      .status,
     200,
   );
   assert.equal((await request(`${base}/src/history.js`)).status, 404);
@@ -166,7 +169,7 @@ test('serves all shipped browser assets and rejects invalid access keys', async 
 });
 
 test('ChatGPT API entries return context handoffs rather than native resume commands', async (t) => {
-  const { base, cookie, request, store, home } = await setup(t);
+  const { base, authorization, request, store, home } = await setup(t);
   const file = join(home, 'conversations.json');
   await writeFile(
     file,
@@ -186,10 +189,10 @@ test('ChatGPT API entries return context handoffs rather than native resume comm
   );
   store.chatgptExport = file;
   await store.refresh();
-  const list = await (await request(`${base}/api/sessions?q=chatgpt`, { headers: { cookie } })).json();
+  const list = await (await request(`${base}/api/sessions?q=chatgpt`, { headers: { authorization } })).json();
   assert.equal(list.total, 1);
   const detail = await (
-    await request(`${base}/api/sessions/${list.sessions[0].id}`, { headers: { cookie } })
+    await request(`${base}/api/sessions/${list.sessions[0].id}`, { headers: { authorization } })
   ).json();
   assert.equal(detail.kind, 'chatgpt');
   assert.match(detail.commands.posix, /'--continue'/);
@@ -198,7 +201,7 @@ test('ChatGPT API entries return context handoffs rather than native resume comm
 });
 
 test('dated segments return one API conversation and the canonical resume command', async (t) => {
-  const { base, cookie, request, store, home } = await setup(t);
+  const { base, authorization, request, store, home } = await setup(t);
   await writeFile(
     join(home, 'sessions', 'continuation.jsonl'),
     [
@@ -217,18 +220,47 @@ test('dated segments return one API conversation and the canonical resume comman
   );
   await store.refresh();
   const list = await (
-    await request(`${base}/api/sessions?project=/tmp/example`, { headers: { cookie } })
+    await request(`${base}/api/sessions?project=/tmp/example`, { headers: { authorization } })
   ).json();
   assert.equal(list.total, 1);
   assert.equal(list.sessions[0].id, id);
-  const detail = await (await request(`${base}/api/sessions/${id}`, { headers: { cookie } })).json();
+  const detail = await (await request(`${base}/api/sessions/${id}`, { headers: { authorization } })).json();
   assert.equal(detail.messages.length, 3);
   assert.ok(detail.commands.posix.endsWith(`codex resume ${id}`));
   assert.equal(detail.commands.posix.includes('another-rollout-segment'), false);
   assert.equal(
-    (await request(`${base}/api/sessions/another-rollout-segment`, { headers: { cookie } })).status,
+    (await request(`${base}/api/sessions/another-rollout-segment`, { headers: { authorization } })).status,
     404,
   );
+});
+
+test('access keys never become cookies and legacy cookies cannot authorize any API', async (t) => {
+  const { base, authorization, request } = await setup(t);
+  const unlock = await request(`${base}/api/unlock`, { method: 'POST', headers: { authorization } });
+  assert.equal(unlock.headers.get('set-cookie'), null);
+  const cookie = `playback_4321=${authorization.slice(7)}`;
+  for (const [path, method] of [
+    ['/api/sessions', 'GET'],
+    [`/api/sessions/${id}`, 'GET'],
+    ['/api/refresh', 'POST'],
+    ['/api/unlock', 'POST'],
+  ] as const) {
+    const response = await request(`${base}${path}`, { method, headers: { cookie } });
+    assert.equal(response.status, 401, `${method} ${path}`);
+  }
+});
+
+test('rejects same-site requests from other ports and cross-site fetches', async (t) => {
+  const { base, authorization, request } = await setup(t);
+  for (const headers of [
+    { authorization, origin: 'http://127.0.0.1:9999' },
+    { authorization, 'sec-fetch-site': 'cross-site' },
+    { authorization: authorization.slice(7) },
+    { authorization: `Bearer ${'a'.repeat(63)}b` },
+  ]) {
+    const response = await request(`${base}/api/sessions`, { headers });
+    assert.ok(response.status === 401 || response.status === 403);
+  }
 });
 
 test('live loopback server serves the browser entry point', async (t) => {

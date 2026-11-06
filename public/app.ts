@@ -489,7 +489,6 @@ try {
   const token = new URLSearchParams(location.hash.slice(1)).get('key');
   if (token) {
     await api('unlock', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    history.replaceState(null, '', location.pathname + location.search);
   }
   await loadSessions();
 } catch (error) {

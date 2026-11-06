@@ -166,6 +166,33 @@ test(
     assert.deepEqual(loadedFonts, [['loaded'], ['loaded']], 'Bundled fonts load without a system fallback');
     const firstTitle = 'Building a better command palette';
     const first = page.getByRole('region', { name: firstTitle, exact: true });
+    await first.getByRole('button', { name: 'Copy resume command', exact: true }).waitFor();
+    assert.deepEqual(await context.cookies(), [], 'Access keys must never be stored in host-wide cookies');
+    await page.reload();
+    await first.getByRole('heading', { name: firstTitle, exact: true }).waitFor();
+    assert.equal(new URL(page.url()).hash, `#key=${token}`, 'Reloads retain the private fragment key');
+
+    const locked = await context.newPage();
+    await locked.goto(base);
+    await locked
+      .getByText('Open the access link printed in your terminal to connect.', { exact: true })
+      .first()
+      .waitFor();
+    assert.equal(await locked.locator('.conversation').count(), 0, 'Tabs without the key remain locked');
+    await locked.close();
+
+    const otherOrigin = 'http://127.0.0.1:4318';
+    let otherHeaders: Record<string, string> = {};
+    await context.route(`${otherOrigin}/**`, async (route) => {
+      otherHeaders = await route.request().allHeaders();
+      await route.fulfill({ status: 200, contentType: 'text/html', body: '<p>Another local service</p>' });
+    });
+    const other = await context.newPage();
+    await other.goto(otherOrigin);
+    assert.equal(otherHeaders.cookie, undefined, 'Other ports receive no access cookie');
+    assert.equal(otherHeaders.authorization, undefined, 'Other ports receive no bearer key');
+    await other.close();
+
     await first.getByRole('button', { name: 'Copy resume command', exact: true }).click();
     await assertClipboard(
       page,
@@ -398,7 +425,7 @@ test(
         content: [
           {
             text:
-              '<img src=x onerror="window.playbackInjected=true"><script>window.playbackInjected=true</script>\n\n```js\nconst reallyLongValue = "' +
+              '<img src=x onerror="window.playbackInjected=true"><script>window.playbackInjected=true</script>\n\n```js\u2028untrusted fence\nconst reallyLongValue = "' +
               'x'.repeat(1600) +
               '";\n```',
           },
@@ -454,7 +481,7 @@ test(
         },
       });
     });
-    await fallback.goto(base);
+    await fallback.goto(`${base}/#key=${token}`);
     await fallback.getByRole('button', { name: 'Copy resume command', exact: true }).first().click();
     const dialog = fallback.getByRole('dialog', { name: 'Copy to your clipboard' });
     await dialog.waitFor();

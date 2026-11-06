@@ -103,7 +103,19 @@ export async function api(
 ): Promise<ListResponse | SessionResponse | ActionResponse> {
   let response: Response;
   try {
-    response = await fetch(`/api/${path}`, options);
+    const headers = new Headers(options.headers);
+    // Keep the capability in the URL fragment, which is never part of an HTTP
+    // request or Referer. No cookies or browser storage are needed, even on reload.
+    const key =
+      typeof location === 'undefined' ? null : new URLSearchParams(location.hash.slice(1)).get('key');
+    if (key && /^[a-f0-9]{64}$/.test(key)) headers.set('Authorization', `Bearer ${key}`);
+    response = await fetch(`/api/${path}`, {
+      ...options,
+      headers,
+      credentials: 'omit',
+      mode: 'same-origin',
+      redirect: 'error',
+    });
   } catch (error) {
     if (isRecord(error) && error.name === 'AbortError') throw error;
     throw new Error('The local server is not responding. Restart codex-playback and open the new link.');

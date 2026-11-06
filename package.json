@@ -1,6 +1,6 @@
 {
   "name": "codex-playback",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A local browser for Codex sessions and ChatGPT exports. Search history and copy terminal continuation commands.",
   "type": "module",
   "license": "MIT",
@@ -21,6 +21,8 @@
     "public/*.ts",
     "README.md",
     "SECURITY.md",
+    "CHANGELOG.md",
+    "docs/security-review.md",
     "LICENSE"
   ],
   "scripts": {

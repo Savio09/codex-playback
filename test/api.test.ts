@@ -67,3 +67,36 @@ test('API client preserves server errors and cancellation while explaining conne
   });
   await assert.rejects(api('sessions?'), /local server is not responding/);
 });
+
+test('API requests omit cookies and refuse redirects', async (t) => {
+  let requestOptions: RequestInit | undefined;
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, options?: RequestInit) => {
+    requestOptions = options;
+    return Response.json({ ok: true });
+  });
+  await api('unlock', { method: 'POST' });
+  assert.equal(requestOptions?.credentials, 'omit');
+  assert.equal(requestOptions?.redirect, 'error');
+  assert.equal(requestOptions?.mode, 'same-origin');
+});
+
+test('API requests use the fragment key without cookies or persistent storage', async (t) => {
+  const key = 'a'.repeat(64);
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Reflect.defineProperty(globalThis, 'location', { configurable: true, value: { hash: `#key=${key}` } });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'location', original);
+    else Reflect.deleteProperty(globalThis, 'location');
+  });
+  const requests: Headers[] = [];
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, options?: RequestInit) => {
+    requests.push(new Headers(options?.headers));
+    return Response.json({ ok: true });
+  });
+  await api('unlock', { method: 'POST' });
+  await api('refresh', { method: 'POST' });
+  assert.deepEqual(
+    requests.map((headers) => headers.get('authorization')),
+    [`Bearer ${key}`, `Bearer ${key}`],
+  );
+});

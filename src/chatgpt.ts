@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { quotePosix } from './commands.js';
+import { quotePosix, quotePowerShell } from './commands.js';
 import { errorCode, isRecord } from '../shared/values.js';
 import type { ChatGptSession, Message, Shell } from '../shared/types.js';
 
@@ -125,7 +125,7 @@ export function handoffCommand(id: string, file: string, shell: Shell = 'posix')
     '--continue',
     id,
   ];
-  if (shell === 'powershell') return `& ${args.map((arg) => `'${arg.replaceAll("'", "''")}'`).join(' ')}`;
+  if (shell === 'powershell') return `& ${args.map(quotePowerShell).join(' ')}`;
   if (shell !== 'posix') throw new Error('Unsupported shell');
   return args.map(quotePosix).join(' ');
 }

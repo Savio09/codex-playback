@@ -57,8 +57,11 @@ interface CodeToken {
   text: string;
 }
 export function codeTokens(text: string): CodeToken[] {
+  // Consume unterminated literals through EOF (including a trailing backslash).
+  // Requiring a closing quote made repeated escaped quotes trigger quadratic
+  // rescanning from every quote in an incomplete or malicious code block.
   const pattern =
-    /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|\b(export|import|from|const|let|var|function|return|async|await|class|def|if|else|for|while|try|catch|throw|new|true|false|null|undefined|public|private|type|interface|func|package|fn|pub|use|mut|match|self)\b|\b\d+(?:\.\d+)?\b/g;
+    /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?(?:\*\/|$))|("(?:\\[\s\S]|[^"\\])*(?:"|\\?$)|'(?:\\[\s\S]|[^'\\])*(?:'|\\?$)|`(?:\\[\s\S]|[^`\\])*(?:`|\\?$))|\b(export|import|from|const|let|var|function|return|async|await|class|def|if|else|for|while|try|catch|throw|new|true|false|null|undefined|public|private|type|interface|func|package|fn|pub|use|mut|match|self)\b|\b\d+(?:\.\d+)?\b/g;
   const tokens: CodeToken[] = [];
   let offset = 0;
   for (const match of text.matchAll(pattern)) {
@@ -82,7 +85,7 @@ export function markdown(
   const lines = text.replaceAll('\r\n', '\n').split('\n');
   for (let i = 0; i < lines.length; ) {
     const line = lines[i] ?? '';
-    const fence = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    const fence = line.match(/^\s*(`{3,}|~{3,})(.*)$/s);
     const marker = fence?.[1];
     if (marker) {
       const language = (fence?.[2] ?? '').trim().slice(0, 40) || 'code';
@@ -127,7 +130,10 @@ export function markdown(
       }
       container.append(list);
     } else {
-      const paragraph: string[] = [];
+      // Every branch must advance, even if a future block matcher disagrees
+      // with the paragraph boundary matcher below.
+      const paragraph: string[] = [line];
+      i++;
       while (
         i < lines.length &&
         (lines[i] ?? '').trim() &&
