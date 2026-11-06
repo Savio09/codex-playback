@@ -38,6 +38,25 @@ You can also run it without a permanent installation:
 npx codex-playback
 ```
 
+## Update
+
+Stop Playback with **Ctrl+C**, update the global installation, then launch it again:
+
+```sh
+npm install -g codex-playback@latest
+codex-playback
+```
+
+Check your installed version with `codex-playback --version`.
+
+If you use npx, request the latest release explicitly:
+
+```sh
+npx codex-playback@latest
+```
+
+See the [changelog](https://github.com/Savio09/codex-playback/blob/main/CHANGELOG.md) for new features and fixes.
+
 ## Use it
 
 1. Choose a project in the sidebar and search for a conversation.
