@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ecf3fe" />
+    <title>Playback — Conversation library</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/Inter-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#reader">Skip to conversation</a>
+    <div id="app" class="app-shell">
+      <aside class="sidebar" aria-label="Library navigation">
+        <a href="/" class="brand" aria-label="Playback home">
+          <span class="brand-mark" data-icon="playback" aria-hidden="true"></span>
+          <span>playback<span class="brand-period">.</span></span>
+        </a>
+        <div class="projects-heading">
+          <span class="section-label">Projects</span>
+          <button
+            class="button library-control"
+            type="button"
+            popovertarget="library-controls"
+            aria-label="Sort and filter projects"
+            title="Sort and filter projects"
+          >
+            <span data-icon="sort"></span>
+          </button>
+        </div>
+        <nav id="projects" class="projects" aria-label="Filter by project"></nav>
+      </aside>
+      <main class="workspace">
+        <header class="topbar">
+          <div class="topbar-leading">
+            <div class="page-heading">
+              <div class="page-title">
+                <h1 id="view-label">Projects</h1>
+                <span id="demo-label" class="reader-source" hidden>Demo</span>
+              </div>
+            </div>
+            <button
+              class="button secondary mobile-library-control"
+              type="button"
+              popovertarget="library-controls"
+              aria-label="Sort and filter projects"
+              title="Sort and filter projects"
+            >
+              <span data-icon="sort"></span>
+            </button>
+          </div>
+          <div class="search-wrap">
+            <span data-icon="search"></span><label for="search" class="sr-only">Search conversations</label
+            ><input
+              id="search"
+              type="search"
+              placeholder="Search conversations…"
+              maxlength="500"
+              autocomplete="off"
+            /><kbd id="search-shortcut" aria-hidden="true">⌘ K</kbd>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh" class="button secondary" aria-label="Refresh history">
+              <span data-icon="refresh"></span><span>Refresh history</span>
+            </button>
+          </div>
+        </header>
+        <div id="notice" class="notice" role="status" hidden></div>
+        <span id="result-count" class="sr-only" role="status">Loading conversations…</span>
+        <section id="reader" class="reader" aria-label="Conversations" tabindex="0">
+          <div id="conversation-feed" class="conversation-feed" aria-busy="true">
+            <div class="conversation-loading">
+              <span class="sr-only">Loading messages…</span>
+              <div class="skeleton-row" aria-hidden="true"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+          <button id="load-more" class="button secondary load-more" hidden>Load more conversations</button>
+        </section>
+      </main>
+    </div>
+    <div
+      id="library-controls"
+      class="library-controls"
+      popover="auto"
+      role="dialog"
+      aria-label="Sort and filter projects"
+    >
+      <div class="control-field">
+        <label for="project-sort">Sort projects</label
+        ><select id="project-sort" autofocus>
+          <option value="az">Name A–Z</option>
+          <option value="za">Name Z–A</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label for="sort">Sort conversations</label
+        ><select id="sort">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="title">Title A–Z</option>
+        </select>
+      </div>
+      <div class="control-field">
+        <label for="terminal-shell">Terminal shell</label
+        ><select id="terminal-shell">
+          <option value="posix">macOS / Linux</option>
+          <option value="powershell">PowerShell</option>
+        </select>
+      </div>
+      <div class="control-field mobile-library-field">
+        <label for="project-select">Project</label
+        ><select id="project-select"></select>
+      </div>
+      <div class="control-field">
+        <label for="archive-select">Status</label
+        ><select id="archive-select">
+          <option value="active">Conversations</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <noscript>Enable JavaScript to browse your local conversations.</noscript>
+  </body>
+</html>

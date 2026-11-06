@@ -1,0 +1,61 @@
+{
+  "name": "codex-playback",
+  "version": "0.1.0",
+  "description": "A local browser for Codex sessions and ChatGPT exports. Search history and copy terminal continuation commands.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "codex-playback": "dist/bin/codex-playback.js"
+  },
+  "files": [
+    "dist/bin/",
+    "dist/src/",
+    "dist/public/",
+    "dist/shared/",
+    "src/",
+    "shared/",
+    "bin/*.ts",
+    "public/*.ts",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.browser.json && tsc -p tsconfig.json && node dist/scripts/build.js",
+    "start": "npm run build && node dist/bin/codex-playback.js",
+    "demo": "npm run build && node dist/bin/codex-playback.js --demo",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.browser.json",
+    "test:browser": "npm run build && node --test dist/test/browser.e2e.js",
+    "record:demo": "npm run build && node dist/scripts/record-demo.js",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "codex",
+    "chatgpt",
+    "cli",
+    "sessions",
+    "history",
+    "local-first"
+  ],
+  "devDependencies": {
+    "@types/node": "22.15.18",
+    "playwright": "1.60.0",
+    "typescript": "6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Savio09/codex-playback.git"
+  },
+  "homepage": "https://github.com/Savio09/codex-playback#readme",
+  "bugs": {
+    "url": "https://github.com/Savio09/codex-playback/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

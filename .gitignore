@@ -1,0 +1,37 @@
+# Dependencies and generated output
+node_modules/
+dist/
+*.tgz
+*.tar.gz
+coverage/
+test-results/
+playwright-report/
+artifacts/
+*.tsbuildinfo
+
+# Local configuration, credentials, and history
+.env*
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+*.jsonl
+conversations.json
+auth.json
+.codex/
+.agents/
+.aws/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local planning and verification notes
+/SPEC.md
+/tasks/
+/docs/verification.md
+/docs/ui-design.md
