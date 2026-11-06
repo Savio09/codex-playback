@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+### Fixed
+
+- Fix initially empty history and failed refresh requests in Safari by preserving the POST Origin header under the no-referrer policy.
+- Add a startup and refresh browser test over real HTTP, with optional WebKit coverage.
+
 ## 0.1.1
 
 ### Security

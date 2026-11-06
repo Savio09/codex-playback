@@ -32,3 +32,13 @@ The two live-server checks still need a normal-terminal `npm test` run. PowerShe
 The sandbox's `npm audit` request failed because DNS resolution for `registry.npmjs.org` was blocked. The maintainer subsequently ran `npm audit` from a normal terminal against this checkout and reported **zero vulnerabilities**. The package has no runtime dependencies, and no dependencies were changed during this review. The advisory scan covers known dependency issues; the source-code findings above require their own fixes and tests.
 
 Playback remains a local tool. It does not protect history from processes running as the same OS user, browser extensions with access to the page, or a compromised machine. Very large local history and export files can still consume substantial memory. Keep the full launch link private, avoid exposing its port, and restart the app after installing the patched release.
+
+## Follow-up: Safari startup compatibility in 0.1.2
+
+Version 0.1.1 forced Fetch's `same-origin` request mode while sending `Referrer-Policy: no-referrer`. For non-GET requests that mode can redact the Origin header to `null`, causing the strict server check to reject startup and refresh POST requests. Changing the archive filter issues GET requests, explaining why the interface could recover afterward. This follows the [Fetch standard's Origin-header algorithm](https://fetch.spec.whatwg.org/#append-a-request-origin-header).
+
+Version 0.1.2 uses the default `cors` request mode with the same relative local API URLs. Host and Origin validation, bearer authentication, no-referrer, omitted cookies, redirect refusal, and the self-only connection policy remain enforced; the server still rejects `Origin: null` and foreign origins. No CORS allowance is added.
+
+The regression test models browser Origin serialization before calling the real HTTP handler. It failed with the original client settings and passes with the corrected mode. A separate browser test uses actual HTTP requests for startup and refresh, checking their final Origin and Referer headers. It can also run in WebKit. The earlier browser suite used request interception and Chrome; it did not check this behavior over a real HTTP connection or in WebKit.
+
+The maintainer confirmed that the patched application loads projects immediately in Safari without opening or changing filters, and reported **both automated browser checks passing** in a normal terminal for 0.1.2. The local suite completed with **50 passed, zero failed, and three skipped** for unavailable loopback or PowerShell execution. Native PowerShell execution remains unverified on this host.

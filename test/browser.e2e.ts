@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, appendFile, readFile, writeFile } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 import type { Page } from 'playwright';
 import { createDemoHome } from '../src/demo.js';
 import { HistoryStore } from '../src/history.js';
-import { createHandler } from '../src/server.js';
-import { errorMessage, isRecord } from '../shared/values.js';
+import { createHandler, startServer } from '../src/server.js';
+import { errorCode, errorMessage, isRecord } from '../shared/values.js';
 import { required } from './helpers.js';
 
 declare global {
@@ -492,5 +492,66 @@ test(
     offline = true;
     await page.getByRole('button', { name: 'Refresh history' }).click();
     await page.getByRole('status').filter({ hasText: 'The local server is not responding.' }).waitFor();
+  },
+);
+
+// Unlike route interception, a real HTTP connection includes the Origin header
+// serialized by the browser's network stack under the document's referrer policy.
+test(
+  'fresh launch and refresh work over real HTTP with strict Origin checks',
+  { timeout: 30000 },
+  async (t) => {
+    const demo = await createDemoHome();
+    t.after(demo.cleanup);
+    const store = new HistoryStore(demo.home);
+    await store.refresh();
+    let app;
+    try {
+      app = await startServer({ store, port: 0, demo: true });
+    } catch (error) {
+      if (errorCode(error) === 'EPERM') return t.skip('Sandbox does not allow listening on local ports');
+      throw error;
+    }
+    t.after(() => app.close());
+    const origin = new URL(app.url).origin;
+    const posts: { path: string | undefined; origin: string | undefined; referer: string | undefined }[] = [];
+    app.server.on('request', (request) => {
+      if (request.method === 'POST')
+        posts.push({ path: request.url, origin: request.headers.origin, referer: request.headers.referer });
+    });
+    let browser;
+    try {
+      browser =
+        process.env.PLAYWRIGHT_STARTUP_BROWSER === 'webkit'
+          ? await webkit.launch({ headless: true })
+          : await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', headless: true });
+    } catch (error) {
+      if (/Operation not permitted|EPERM|bootstrap_check_in|Permission denied/.test(errorMessage(error)))
+        return t.skip('Sandbox prevents launching a browser; run npm run test:browser outside the sandbox');
+      throw error;
+    }
+    t.after(() => browser.close());
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const unlocked = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/unlock');
+    await page.goto(app.url);
+    assert.equal((await unlocked).status(), 200, 'Fresh launch must authenticate without changing a filter');
+    await page.getByRole('heading', { name: 'Building a better command palette', exact: true }).waitFor();
+    await page.waitForFunction(
+      () => document.querySelector<HTMLButtonElement>('.copy-resume')?.disabled === false,
+    );
+    assert.equal(await page.locator('.project-item').count(), 3);
+    assert.equal(await page.locator('.conversation').count(), 3);
+    const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/refresh');
+    await page.getByRole('button', { name: 'Refresh history' }).click();
+    assert.equal((await refreshed).status(), 200);
+    await page.getByRole('status').filter({ hasText: 'History refreshed.' }).waitFor();
+    assert.deepEqual(posts, [
+      { path: '/api/unlock', origin, referer: undefined },
+      { path: '/api/refresh', origin, referer: undefined },
+    ]);
+    assert.deepEqual(errors, []);
   },
 );

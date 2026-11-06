@@ -113,7 +113,9 @@ export async function api(
       ...options,
       headers,
       credentials: 'omit',
-      mode: 'same-origin',
+      // The default CORS mode preserves the POST Origin under no-referrer.
+      // URLs remain local, redirects are refused, and the server verifies Origin.
+      mode: 'cors',
       redirect: 'error',
     });
   } catch (error) {

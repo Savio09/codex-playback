@@ -24,6 +24,14 @@ npx playwright install chromium
 PLAYWRIGHT_CHANNEL=chromium npm run test:browser
 ```
 
+The startup and refresh test uses a real loopback HTTP connection to check browser-generated Origin headers. To run that check with WebKit, Safari's browser engine:
+
+```sh
+npx playwright install webkit
+npm run build
+PLAYWRIGHT_STARTUP_BROWSER=webkit node --test --test-name-pattern='fresh launch' dist/test/browser.e2e.js
+```
+
 Write strict TypeScript and keep changes focused. Validate external JSON before using it, render history through text nodes, and keep history access read-only. Include regression tests for changes to parsing, commands, or interactions. Generated output, dependencies, private exports, credentials, and personal-history screenshots do not belong in commits.
 
 ## Record the demo

@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { api } from '../public/api.js';
 import { HistoryStore } from '../src/history.js';
+import { createHandler } from '../src/server.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ListResponse, SessionResponse } from '../shared/types.js';
 
 const list: ListResponse = {
@@ -77,7 +81,7 @@ test('API requests omit cookies and refuse redirects', async (t) => {
   await api('unlock', { method: 'POST' });
   assert.equal(requestOptions?.credentials, 'omit');
   assert.equal(requestOptions?.redirect, 'error');
-  assert.equal(requestOptions?.mode, 'same-origin');
+  assert.equal(requestOptions?.mode, 'cors');
 });
 
 test('API requests use the fragment key without cookies or persistent storage', async (t) => {
@@ -99,4 +103,49 @@ test('API requests use the fragment key without cookies or persistent storage', 
     requests.map((headers) => headers.get('authorization')),
     [`Bearer ${key}`, `Bearer ${key}`],
   );
+});
+
+test('startup and refresh retain a verifiable Origin under the no-referrer policy', async (t) => {
+  const home = await mkdtemp(join(tmpdir(), 'playback-request-origin-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const origin = 'http://127.0.0.1:4321';
+  const token = 'a'.repeat(64);
+  const handler = createHandler({ store: new HistoryStore(home), token, origin });
+  const sentOrigins: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (path: string, options?: RequestInit) => {
+    const request = new Request(new URL(path, origin), { ...options, referrerPolicy: 'no-referrer' });
+    const headers = Object.fromEntries(request.headers);
+    headers.host = new URL(origin).host;
+    // Fetch's "append a request Origin header" algorithm redacts non-CORS POST
+    // origins under no-referrer. Model that browser behavior before the real handler.
+    // https://fetch.spec.whatwg.org/#append-a-request-origin-header
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      headers.origin = request.mode === 'cors' ? origin : 'null';
+      sentOrigins.push(headers.origin);
+    }
+    let status = 200;
+    let body: string | Buffer = '';
+    const responseHeaders = new Headers();
+    await handler(
+      { url: new URL(request.url).pathname, method: request.method, headers, resume() {} },
+      {
+        setHeader: (name, value) => responseHeaders.set(name, value),
+        writeHead: (code, values) => {
+          status = code;
+          for (const [name, value] of Object.entries(values)) responseHeaders.set(name, value);
+        },
+        end: (value) => {
+          body = value ?? '';
+        },
+      },
+    );
+    return new Response(typeof body === 'string' ? body : new Uint8Array(body), {
+      status,
+      headers: responseHeaders,
+    });
+  });
+  const options = { method: 'POST', headers: { Authorization: `Bearer ${token}` } };
+  assert.equal((await api('unlock', options)).ok, true);
+  assert.equal((await api('refresh', options)).ok, true);
+  assert.deepEqual(sentOrigins, [origin, origin]);
 });

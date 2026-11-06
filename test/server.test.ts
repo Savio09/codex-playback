@@ -254,6 +254,7 @@ test('rejects same-site requests from other ports and cross-site fetches', async
   const { base, authorization, request } = await setup(t);
   for (const headers of [
     { authorization, origin: 'http://127.0.0.1:9999' },
+    { authorization, origin: 'null' },
     { authorization, 'sec-fetch-site': 'cross-site' },
     { authorization: authorization.slice(7) },
     { authorization: `Bearer ${'a'.repeat(63)}b` },
